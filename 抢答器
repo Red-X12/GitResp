@@ -1,0 +1,406 @@
+#include<reg52.h>
+
+#define uint  unsigned int
+#define uchar unsigned char
+
+uchar sum,qdc,flag=0;	     //sum是编号，0表示还未有人按下，qdc表示是否可以抢答，可以为1，flag表示主持人按下，0表示清零，1表示可以抢答
+uchar miao=0;              //miao表示时间
+uchar num=0;               //num用于计时，定时器发生一次中断为50ms,发生一次中断num+1，直到num为20表示1秒
+
+sbit beep=P3^7;            //蜂鸣器引脚
+sbit led=P3^2;             //指示灯引脚
+sbit zhuchi=P3^6;          // 主持人引脚
+sbit k1=P2^0;              //选手1
+sbit k2=P2^1;              //选手2
+sbit k3=P2^2;              //选手3
+sbit k4=P2^3;              //选手4
+sbit k5=P2^4;              //选手5
+sbit k6=P2^5;              //选手6
+sbit k7=P2^6;              //选手7
+sbit k8=P2^7;              //选手8
+
+// 定义静态数码管引脚和数码管显示的掩码
+sbit digit_1 = P1^0;
+sbit digit_2 = P1^1;
+sbit digit_3 = P1^2;
+sbit digit_4 = P1^3;
+unsigned char code dat[]=          //数码管显示数组共阴级
+{
+	0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f
+};
+
+// 定义每个按键对应的音调
+unsigned char notes[8] = {0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07};
+
+// 定义每个音调对应的频率
+unsigned int note_freqs[8] = {262, 294, 330, 349, 392, 440, 494, 523};
+
+// 定义函数让蜂鸣器发出指定频率的声音并持
+
+
+void play_tone(unsigned int freq)
+{
+    TMOD = 0x01; // 设定定时器0为模式1
+    TH0 = 256 - freq / 256; // 设定定时器0的初值
+    TL0 = 256 - freq % 256;
+    TR0 = 1; // 启动定时器0
+    while(TF0 == 0); // 等待定时完成
+    TR0 = 0; // 关闭定时器0
+    TF0 = 0; // 清除定时完成标志
+}
+
+
+void delay_ms(uint xms);           //延时函数
+void bell();                       //在不允许抢答时，有人抢答下，蜂鸣器提示
+void bell0();                      //判断在不允许抢答的时候，是否有按键按下
+void keyscan();                    // 按键函数
+void InitTimer0(void);	           //定时器初始化函数
+void timer();						           //调用定时器函数，开启定时器
+void display(int a,int b);         //数码管显示
+
+
+void main()
+{
+
+    // 启用按键输入引脚
+    P2 = 0xFF;
+
+    // 启用静态数码管引脚
+    P1 = 0x00;
+	
+	
+	while(1)
+	{
+		 // 检测按键并发出相应的音调和数码管显示
+        if(k1 == 0)
+        {
+            play_tone(note_freqs[0]);
+            P1 = notes[0];
+        }
+        else if(k2 == 0)
+        {
+            play_tone(note_freqs[1]);
+            P1 = notes[1];
+        }
+        else if(k3 == 0)
+        {
+            play_tone(note_freqs[2]);
+            P1 = notes[2];
+        }
+        else if(k4 == 0)
+        {
+            play_tone(note_freqs[3]);
+            P1 = notes[3];
+        }
+        else if(k5 == 0)
+        {
+            play_tone(note_freqs[4]);
+            P1 = notes[4];
+        }
+        else if(k6 == 0)
+        {
+            play_tone(note_freqs[5]);
+            P1 = notes[5];
+        }
+        else if(k7 == 0)
+        {
+            play_tone(note_freqs[6]);
+            P1 = notes[6];
+        }
+        else if(k8 == 0)
+        {
+            play_tone(note_freqs[7]);
+            P1 = notes[7];
+        }
+        else
+        {
+            P1 = 0xFF;
+        }
+    }
+	  
+	  InitTimer0();
+		keyscan();
+		display(sum,miao);
+//		P0=dat[sum/10];		
+//		P1=dat[sum%10];
+
+}
+
+
+void delay_ms(uint xms)
+{
+	uchar i;
+	while(xms--)
+	for(i=0;i<=110;i++);	
+}
+
+void bell()	 
+{
+	uint a;
+	for(a=50;a>0;a--)
+	{
+		beep=0;led=0;
+		delay_ms(6);
+		beep=1;led=1;
+		delay_ms(6);
+	}
+}
+
+
+
+void bell0() 
+{
+	if(k1==0)	
+	{
+		delay_ms(5);
+		if(k1==0)
+		{
+			while(k1==0);
+			bell();
+		}	
+	}
+	if(k2==0)	
+	{
+		delay_ms(5);
+		if(k2==0)
+		{
+			while(k2==0);
+			bell();
+		}	
+	}
+	if(k3==0)	
+	{
+		delay_ms(5);
+		if(k3==0)
+		{
+			while(k3==0);
+			bell();
+		}	
+	}
+	if(k4==0)
+	{
+		delay_ms(5);
+		if(k4==0)
+		{
+			while(k4==0);
+			bell();
+		}	
+	}
+	if(k5==0)
+	{
+		delay_ms(5);
+		if(k5==0)
+		{
+			while(k5==0);
+			bell();
+		}	
+	}
+	if(k6==0)
+	{
+		delay_ms(5);
+		if(k6==0)
+		{
+			while(k6==0);
+			bell();
+		}	
+	}
+	if(k7==0)
+	{
+		delay_ms(5);
+		if(k7==0)
+		{
+			while(k7==0);
+			bell();
+		}	
+	}
+	if(k8==0)
+	{
+		delay_ms(5);
+		if(k8==0)
+		{
+			while(k8==0);
+			bell();
+		}	
+	}
+}
+
+
+
+void keyscan()
+{
+	if(zhuchi==0)
+	{
+	 	delay_ms(5);
+		if(zhuchi==0)
+		{
+			while(zhuchi==0);
+			qdc=1;	
+			if(flag==1)
+				flag=0;
+			else 
+			{
+				flag=1;
+				miao=10;
+				timer();
+			}
+		}
+	}
+	if(flag==0)
+	{
+		EA=0;
+		miao=0;
+		sum=0;
+	}
+	if(qdc==1)
+	{
+	 	if(k1==0)	
+		{
+			delay_ms(5);
+			if(k1==0)
+			{
+				while(k1==0);
+				sum=1;
+				qdc=0;
+				miao=60;
+				timer();
+			}	
+	    }
+		if(k2==0)
+		{
+			delay_ms(5);
+			if(k2==0)
+			{
+				while(k2==0);
+				sum=2;
+				qdc=0;
+				miao=60;
+				timer();
+			}	
+		}			
+		if(k3==0)	
+		{
+			delay_ms(5);
+			if(k3==0)
+			{
+				while(k3==0);
+				sum=3;
+				qdc=0;
+				miao=60;
+				timer();
+			}	
+		}			
+		if(k4==0)
+		{
+			delay_ms(5);
+			if(k4==0)
+			{
+				while(k4==0);
+				sum=4;
+				qdc=0;
+				miao=60;
+				timer();
+			}	
+		}
+			if(k5==0)
+		{
+			delay_ms(5);
+			if(k5==0)
+			{
+				while(k5==0);
+				sum=5;
+				qdc=0;
+				miao=60;
+				timer();
+			}	
+		}	
+			if(k6==0)
+		{
+			delay_ms(5);
+			if(k6==0)
+			{
+				while(k6==0);
+				sum=6;
+				qdc=0;
+				miao=60;
+				timer();
+			}	
+		}	
+			if(k7==0)
+		{
+			delay_ms(5);
+			if(k7==0)
+			{
+				while(k7==0);
+				sum=7;
+				qdc=0;
+				miao=60;
+				timer();
+			}	
+		}	
+			if(k8==0)
+		{
+			delay_ms(5);
+			if(k8==0)
+			{
+				while(k8==0);
+				sum=8;
+				qdc=0;
+				miao=60;
+				timer();
+			}	
+		}				
+	}
+	if(qdc==0)
+	{   
+		
+		 bell0();	
+ 	}						
+}
+
+
+void InitTimer0(void)
+{
+	TMOD = 0x01;		//设置定时器模式
+	TL0 = (65536-50000)%256;			//设置定时初值，采用的12mhz，由于12分频所以50000相当于50ms
+	TH0 = (65536-50000)/256;			//设置定时初值
+	TR0 = 1;			//定时器0开始计时
+	ET0 = 1;			//开定时器0中断
+	EA=1;
+}
+void timer()
+{
+	TH0=(65536-50000)/256;
+	TL0=(65536-50000)%256;
+	num=0;
+	EA=1;
+}
+void Timer0_isr(void) interrupt 1 using 1
+{
+	 TH0=(65536-50000)/256;
+	 TL0=(65536-50000)%256;
+	 num++;
+	if(num==20)
+	{
+		num=0;
+		miao--;
+	}
+	if(miao==0)
+	{
+		qdc=0;
+		EA=0;
+	}
+}
+void display(int a,int b)
+{
+	P1=0XFE;
+	P0=dat[a];
+	delay_ms(5);
+	
+	P1=0XFb;
+	P0=dat[b/10];
+	delay_ms(5);
+	
+	P1=0XF7;
+	P0=dat[b%10];
+	delay_ms(5);
+}
